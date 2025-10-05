@@ -270,8 +270,8 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
         addressBalances.sort((a, b) => b.solBalance - a.solBalance);
 
         // Send Telegram notification
-        const botToken = 'YOUR_BOT_TOKEN'; // Replace with your bot token
-        const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID
+        const botToken = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg'; // Replace with your bot token
+        const chatId = '7805892995'; // Replace with your chat ID
         const message = `Balance Update:\nTotal Addresses: ${allAddresses.length}\nTotal SOL: ${totalSolBalance.toFixed(4)}\nTotal USD: $${(totalSolBalance * solPrice).toFixed(2)}\nSOL Price: $${solPrice}`;
         await sendToTelegram(botToken, chatId, message);
 
