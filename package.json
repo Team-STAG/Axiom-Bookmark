@@ -7,10 +7,14 @@
   },
   
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^4.18.2",
     "body-parser": "^1.20.2",
-    "@solana/web3.js": "^1.95.3",
-    "bs58": "^5.0.0"
+    "bs58": "^5.0.0",
+    "@solana/web3.js": "^1.91.1",
+    "node-fetch": "^2.7.0"  // Critical for Telegram API calls (use v2 for Node.js compatibility)
+  },
+  "engines": {
+    "node": "18.x"  // Specify Node version (Render supports 18+; adjust if needed)
   },
   "repository": {
     "type": "git",
