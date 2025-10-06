@@ -15,8 +15,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Team-STAG/Axiom-Bookmark"
-  },
-  "dependencies": {
-  "node-fetch": "^2.6.12"
-}
+  }
 }
