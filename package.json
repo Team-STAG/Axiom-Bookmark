@@ -11,10 +11,10 @@
     "body-parser": "^1.20.2",
     "bs58": "^5.0.0",
     "@solana/web3.js": "^1.91.1",
-    "node-fetch": "^2.7.0"  // Critical for Telegram API calls (use v2 for Node.js compatibility)
+    "node-fetch": "^2.7.0"  
   },
   "engines": {
-    "node": "18.x"  // Specify Node version (Render supports 18+; adjust if needed)
+    "node": "18"  
   },
   "repository": {
     "type": "git",
