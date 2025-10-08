@@ -3,379 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ApexFusion - Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>Dashboard - Bookmark Site</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #0f0f23, #1a1a3e); 
+            color: #fff; 
+            min-height: 100vh; 
         }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+        .nav { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 1rem 2rem; background: rgba(17, 24, 39, 0.9); 
+            border-bottom: 1px solid #374151; backdrop-filter: blur(10px); 
         }
-
-        .background-video {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: -2;
-            opacity: 0.3;
+        .logo { font-size: 1.5rem; font-weight: 700; color: #526FFF; }
+        .solana-nav { 
+            display: flex; align-items: center; gap: 0.5rem; 
+            background: rgba(82, 111, 255, 0.1); padding: 0.5rem 1rem; 
+            border-radius: 8px; border: 1px solid #526FFF; cursor: pointer; 
+            transition: all 0.2s; 
         }
-
-        .video-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            z-index: -1;
+        .solana-nav:hover { background: rgba(82, 111, 255, 0.2); }
+        .sol-icon { width: 24px; height: 24px; fill: #9945FF; } /* Solana purple */
+        .balance { font-weight: 600; color: #fff; }
+        .main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        .hero { text-align: center; margin-bottom: 2rem; }
+        .hero h1 { font-size: 2.5rem; background: linear-gradient(135deg, #526FFF, #9945FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; }
+        .hero p { color: rgba(255,255,255,0.7); font-size: 1.1rem; }
+        .table-container { background: rgba(17, 24, 39, 0.9); border-radius: 12px; overflow: hidden; border: 1px solid #374151; margin-bottom: 2rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #374151; }
+        th { background: rgba(82, 111, 255, 0.1); font-weight: 600; color: #526FFF; }
+        tr:hover { background: rgba(82, 111, 255, 0.05); }
+        .withdraw-card { 
+            background: rgba(17, 24, 39, 0.9); padding: 2rem; border-radius: 12px; 
+            border: 1px solid #374151; display: flex; gap: 2rem; align-items: flex-start; 
         }
-
-        .header {
-            padding: 16px 24px;
-            background: rgba(12, 12, 12, 0.8);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #00ff88, #00bfff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .logo::before {
-            content: "🚀";
-            font-size: 28px;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 15px;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #ffffff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-        }
-
-        .btn:hover {
-            background: linear-gradient(135deg, #00ff88, #00bfff);
-            border-color: transparent;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
-        }
-
-        .btn svg {
-            width: 18px;
-            height: 18px;
-            fill: #ffffff;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px 24px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .welcome-section {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .welcome-title {
-            font-size: 48px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #00ff88, #00bfff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 16px;
-        }
-
-        .welcome-subtitle {
-            font-size: 18px;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 32px;
-        }
-
-        .balance-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 40px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .balance-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 191, 255, 0.1));
-            z-index: -1;
-        }
-
-        .balance-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 255, 136, 0.2);
-        }
-
-        .balance-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-
-        .balance-amount {
-            font-size: 64px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #00ff88, #00bfff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-        }
-
-        .balance-label {
-            font-size: 18px;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 20px;
-        }
-
-        .balance-actions {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.1);
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: 800;
-            color: #00ff88;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 14px;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #00ff88;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #00ff88, #00bfff);
-            color: #000;
-            padding: 16px 24px;
-            border-radius: 10px;
-            z-index: 1000;
-            display: none;
-            font-weight: 600;
-            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.3);
-        }
-
-        @media (max-width: 768px) {
-            .welcome-title {
-                font-size: 36px;
-            }
-
-            .balance-amount {
-                font-size: 48px;
-            }
-
-            .balance-actions {
-                flex-direction: column;
-            }
-        }
+        .withdraw-form { flex: 1; }
+        .withdraw-form input, .withdraw-form textarea { width: 100%; padding: 0.75rem; margin-bottom: 1rem; background: rgba(0,0,0,0.4); border: 1px solid #374151; border-radius: 8px; color: #fff; }
+        .withdraw-btn { background: linear-gradient(135deg, #4ade80, #22c55e); color: #000; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .withdraw-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3); }
+        .withdraw-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .loading { text-align: center; color: #526FFF; padding: 2rem; }
+        .error { color: #ef4444; text-align: center; padding: 1rem; background: rgba(239,68,68,0.1); border-radius: 8px; margin: 1rem 0; }
+        .success { color: #4ade80; text-align: center; padding: 1rem; background: rgba(74,222,128,0.1); border-radius: 8px; margin: 1rem 0; }
+        @media (max-width: 768px) { .nav, .main, .withdraw-card { padding: 1rem; } .hero h1 { font-size: 2rem; } }
     </style>
 </head>
 <body>
-    <video class="background-video" autoplay muted loop id="backgroundVideo">
-        <source src="https://r2.guns.lol/db4d56f0-b5a8-4e40-a0ee-bc5d5e27b7ae.mp4" type="video/mp4">
-    </video>
-    <div class="video-overlay"></div>
+    <nav class="nav">
+        <div class="logo">Bookmark Dashboard</div>
+        <div class="solana-nav" onclick="refreshBalance()">
+            <svg class="sol-icon" viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7l-10-5zM5.5 15.5l5-2.5V9l-5 2.5V15.5zM18.5 15.5l-5-2.5V9l5 2.5V15.5z"/></svg>
+            <span class="balance" id="solBalance">0 SOL</span>
+        </div>
+    </nav>
     
-    <div class="notification" id="notification"></div>
-
-    <header class="header">
-        <div class="logo">ApexFusion</div>
-        <div class="header-actions">
-            <button class="btn" onclick="logout()">
-                <svg viewBox="0 0 24 24"><path d="M16,17V14H9V10H16V7L21,12L16,17M14,2A2,2 0 0,1 16,4V6H14V4H5V20H14V18H16V20A2,2 0 0,1 14,22H5A2,2 0 0,1 3,20V4A2,2 0 0,1 5,2H14Z"/></svg>
-                Logout
-            </button>
+    <main class="main">
+        <section class="hero">
+            <h1>Welcome Back!</h1>
+            <p>Manage your bookmark data and wallets below.</p>
+        </section>
+        
+        <div id="dataSection">
+            <div class="loading">Loading your data...</div>
         </div>
-    </header>
-
-    <div class="container">
-        <div class="welcome-section">
-            <h1 class="welcome-title">Welcome to ApexFusion</h1>
-            <p class="welcome-subtitle">Your gateway to the future of decentralized finance</p>
-        </div>
-
-        <div class="balance-card">
-            <div class="balance-icon">💰</div>
-            <div class="balance-amount" id="balanceAmount">$0.00</div>
-            <div class="balance-label">Available Balance</div>
-            <div class="balance-actions">
-                <button class="btn" onclick="deposit()">Deposit</button>
-                <button class="btn" onclick="withdraw()">Withdraw</button>
+        
+        <div class="withdraw-card">
+            <h2 style="margin-bottom: 1rem; color: #526FFF;">Request Withdrawal</h2>
+            <form id="withdrawForm" class="withdraw-form" style="flex: 1;">
+                <input type="number" id="amount" placeholder="Amount (SOL)" step="0.0001" min="0.001" required>
+                <textarea id="note" placeholder="Reason for withdrawal (optional)" rows="3" maxlength="500"></textarea>
+                <button type="submit" class="withdraw-btn" id="withdrawBtn" disabled>Request Withdrawal</button>
+            </form>
+            <div style="flex: 1; text-align: center; color: rgba(255,255,255,0.6);">
+                <p>Current Balance: <span id="cardBalance">0 SOL</span></p>
+                <p style="font-size: 0.875rem;">Admin approval required</p>
             </div>
         </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalTransactions">0</div>
-                <div class="stat-label">Total Transactions</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="activeWallets">1</div>
-                <div class="stat-label">Active Wallets</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="level">1</div>
-                <div class="stat-label">User Level</div>
-            </div>
-        </div>
-    </div>
+    </main>
 
     <script>
-        let userBalance = 0;
-        let userToken = localStorage.getItem('userAuth'); // Assume user auth token
+        let currentBalance = 0;
 
-        async function loadDashboard() {
-            if (!userToken) {
-                window.location.href = '/login';
+        // Fetch and display user data
+        async function loadData() {
+            const dataSection = document.getElementById('dataSection');
+            dataSection.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch('/api/user-bookmark-data');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    dataSection.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.7);">No bookmark data yet. Use the bookmarklet to add entries!</p>';
+                } else {
+                    dataSection.innerHTML = `
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>ID</th><th>Timestamp</th><th>Site</th><th>Wallets Count</th><th>Balance (SOL)</th></tr></thead>
+                                <tbody>${data.map(entry => `
+                                    <tr>
+                                        <td>${entry.id}</td>
+                                        <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                                        <td>${entry.site || 'N/A'}</td>
+                                        <td>${entry.processedSBundles ? entry.processedSBundles.count : 0}</td>
+                                        <td>${entry.totalWalletBalance || '0.0000'}</td>
+                                    </tr>
+                                `).join('')}</tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                dataSection.innerHTML = '<div class="error">Error loading data. <button onclick="loadData()">Retry</button></div>';
+                console.error('Error:', error);
+            }
+        }
+
+        // Fetch and update balance
+        async function refreshBalance() {
+            try {
+                const response = await fetch('/api/user-balance');
+                const { balance } = await response.json();
+                currentBalance = parseFloat(balance);
+                
+                document.getElementById('solBalance').textContent = `${currentBalance.toFixed(4)} SOL`;
+                document.getElementById('cardBalance').textContent = `${currentBalance.toFixed(4)} SOL`;
+                
+                // Enable/disable withdraw based on balance
+                document.getElementById('withdrawBtn').disabled = currentBalance < 0.001;
+            } catch (error) {
+                console.error('Balance error:', error);
+                document.getElementById('solBalance').textContent = 'Error';
+            }
+        }
+
+        // Withdraw form handler
+        document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('amount').value);
+            const note = document.getElementById('note').value.trim();
+            
+            if (amount > currentBalance) {
+                alert('Amount exceeds your balance!');
                 return;
             }
-
+            
+            const withdrawBtn = document.getElementById('withdrawBtn');
+            withdrawBtn.disabled = true;
+            withdrawBtn.textContent = 'Requesting...';
+            
             try {
-                // Fetch balance from API (adjust endpoint as needed)
-                const response = await fetch('/api/balance', {
-                    headers: { 'Authorization': `Bearer ${userToken}` }
+                const response = await fetch('/api/withdraw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, note })
                 });
-                const data = await response.json();
-                if (data.success) {
-                    userBalance = data.balance || 0;
-                    document.getElementById('balanceAmount').textContent = `$${userBalance.toFixed(2)}`;
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Withdrawal requested! Admin will review.');
+                    document.getElementById('withdrawForm').reset();
+                    refreshBalance(); // Update balance if needed
                 } else {
-                    showNotification('Failed to load balance');
+                    alert(`Error: ${result.error}`);
                 }
-
-                // Fetch other stats (placeholder)
-                document.getElementById('totalTransactions').textContent = '42';
-                document.getElementById('level').textContent = '3';
             } catch (error) {
-                console.error('Error loading dashboard:', error);
-                showNotification('Error loading data');
+                alert('Request failed. Try again.');
+            } finally {
+                withdrawBtn.disabled = false;
+                withdrawBtn.textContent = 'Request Withdrawal';
             }
-        }
+        });
 
-        function showNotification(message) {
-            const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.style.display = 'block';
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
-        }
-
-        function deposit() {
-            showNotification('Deposit functionality coming soon!');
-            // Implement deposit modal/logic
-        }
-
-        function withdraw() {
-            showNotification('Withdraw functionality coming soon!');
-            // Implement withdraw modal/logic
-        }
-
-        async function logout() {
-            localStorage.removeItem('userAuth');
-            window.location.href = '/login';
-        }
-
-        // Load on page ready
-        window.addEventListener('DOMContentLoaded', loadDashboard);
+        // Init on load
+        loadData();
+        refreshBalance();
+        setInterval(refreshBalance, 30000); // Refresh balance every 30s
     </script>
 </body>
 </html>
