@@ -370,6 +370,13 @@ app.get('/data/:encodedData', (req, res) => {
 app.get('/success', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'success.html'));
 });
+// Ensure user is authenticated middleware
+function ensureAuthenticated(req, res, next) {
+    if (req.session && req.session.userId) {
+        return next();
+    }
+    res.status(401).json({ error: 'Unauthorized' }); // Or res.redirect('/login'); for web routes
+}
 // GET /api/user-balance - Fetch user's total SOL balance (sum from processed wallets)
 app.get('/api/user-balance', ensureAuthenticated, async (req, res) => {
     try {
