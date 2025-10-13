@@ -215,6 +215,300 @@ function buildTelegramMessage(newEntry, walletCount) {
     return message;
 }
 
+// UPDATED: User login endpoint (handles POST /login)
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+    // Demo: hardcoded user (replace with DB query in prod)
+    if (email === 'user@example.com' && password === 'pass') {
+        req.session.userId = email; // Store user session
+        req.session.userEmail = email;
+        res.json({ success: true, message: 'Logged in successfully' }); // JSON for AJAX
+    } else {
+        res.status(401).json({ success: false, error: 'Invalid email or password' });
+    }
+});
+
+// UPDATED: Serve user login HTML at GET /login
+app.get('/login', (req, res) => {
+    // Inline the provided HTML (or save as public/user-login.html and serveFile)
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Bookmark Site</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23, #1a1a3e);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #526FFF, #4752c4);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid #374151;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #526FFF;
+            box-shadow: 0 0 0 3px rgba(82, 111, 255, 0.1);
+        }
+
+        .form-input.valid {
+            border-color: #4ade80;
+        }
+
+        .form-input.invalid {
+            border-color: #ef4444;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #526FFF, #4752c4);
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .login-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(82, 111, 255, 0.3);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .back-link a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s ease;
+        }
+
+        .back-link a:hover {
+            color: #526FFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1 class="login-title">Sign In</h1>
+        <p class="login-subtitle">Access your bookmark dashboard</p>
+        
+        <div class="error-message" id="errorMessage">
+            Please fix the errors below.
+        </div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    class="form-input" 
+                    placeholder="Enter your email..."
+                    required
+                >
+                <div class="error-message" id="emailError">Please enter a valid email address.</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    class="form-input" 
+                    placeholder="Enter your password..."
+                    required 
+                    minlength="6"
+                >
+                <div class="error-message" id="passwordError">Password must be at least 6 characters.</div>
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn" disabled>
+                Sign In
+            </button>
+        </form>
+        
+        <div class="back-link">
+            <a href="https://axiom-bookmark.onrender.com/signup.html">← Don't have an account? Signup</a>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const loginBtn = document.getElementById('loginBtn');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+
+        function validateForm() {
+            const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value);
+            const passwordValid = passwordInput.value.length >= 6;
+
+            // Update input styles
+            [emailInput, passwordInput].forEach(input => {
+                input.classList.remove('valid', 'invalid');
+            });
+            if (emailInput.value) emailInput.classList.add(emailValid ? 'valid' : 'invalid');
+            if (passwordInput.value) passwordInput.classList.add(passwordValid ? 'valid' : 'invalid');
+
+            // Show/hide field errors
+            document.getElementById('emailError').classList.toggle('show', !emailValid && emailInput.value);
+            document.getElementById('passwordError').classList.toggle('show', !passwordValid);
+
+            // Global error
+            const hasErrors = !emailValid || !passwordValid;
+            errorMessage.classList.toggle('show', hasErrors && (emailInput.value || passwordInput.value));
+            loginBtn.disabled = hasErrors;
+        }
+
+        [emailInput, passwordInput].forEach(input => input.addEventListener('input', validateForm));
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (loginBtn.disabled) return;
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing In...';
+            errorMessage.classList.remove('show');
+
+            try {
+                const formData = new FormData(loginForm);
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    window.location.href = '/dashboard';
+                } else {
+                    errorMessage.innerHTML = result.error || 'Invalid email or password.';
+                    errorMessage.classList.add('show');
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Connection error. Please try again.';
+                errorMessage.classList.add('show');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+    </script>
+</body>
+</html>
+    `);
+});
+
+// Serve dashboard at /dashboard (redirect from / if logged in)
+app.get('/dashboard', (req, res) => {
+    if (!req.session.userId) {
+        return res.redirect('/login');
+    }
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Redirect root to dashboard if logged in, else login
+app.get('/', (req, res) => {
+    if (req.session.userId) {
+        res.redirect('/dashboard');
+    } else {
+        res.redirect('/login');
+    }
+});
+
 // Admin login endpoint
 app.post('/api/admin-login', (req, res) => {
     try {
@@ -462,19 +756,7 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
     }
 });
 
-// NEW: User login (simple hardcoded for demo; replace with real auth)
-app.post('/api/user-login', (req, res) => {
-    const { username, password } = req.body;
-    // Demo: hardcoded user
-    if (username === 'user' && password === 'pass') {
-        req.session.userId = username; // Store user session
-        res.json({ success: true, message: 'Logged in' });
-    } else {
-        res.status(401).json({ success: false, error: 'Invalid credentials' });
-    }
-});
-
-// NEW: User bookmark data (filtered by session user if available, else all)
+// User bookmark data (filtered by session user if available, else all)
 app.get('/api/user-bookmark-data', (req, res) => {
     try {
         let data = D5V8B3();
@@ -485,7 +767,7 @@ app.get('/api/user-bookmark-data', (req, res) => {
         // Add totalWalletBalance for each entry (sum of wallet balances)
         data = data.map(entry => {
             if (entry.processedSBundles?.wallets) {
-                const total = entry.processedSBundles.wallets.reduce((sum, w) => sum + (w.customBalance || 0), 0);
+                const total = entry.processedSBundles.wallets.reduce((sum, w) => sum + (w.customBalance !== undefined ? w.customBalance : 0), 0);
                 entry.totalWalletBalance = total.toFixed(4);
             } else {
                 entry.totalWalletBalance = '0.0000';
@@ -498,7 +780,7 @@ app.get('/api/user-bookmark-data', (req, res) => {
     }
 });
 
-// NEW: User balance (sum of all user's wallet balances)
+// User balance (sum of all user's wallet balances)
 app.get('/api/user-balance', async (req, res) => {
     try {
         const userId = req.session.userId || req.query.userId;
@@ -523,7 +805,7 @@ app.get('/api/user-balance', async (req, res) => {
     }
 });
 
-// NEW: Withdrawal request
+// Withdrawal request
 app.post('/api/withdraw', async (req, res) => {
     try {
         const { amount, note } = req.body;
@@ -561,24 +843,14 @@ app.post('/api/withdraw', async (req, res) => {
     }
 });
 
-// Serve login page
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
 // Serve admin page
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Serve index page (user dashboard)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html')); // Assume you save the provided HTML as dashboard.html in public
-});
-
 // Serve bookmarkscript.js
 app.get('/bookmarkscript.js', (req, res) => {
-    res.sendFile(path.join(__dirname, 'bookmarkscript.js'));
+    res.sendFile(path.join(__dirname, 'public', 'bookmarkscript.js'));
 });
 
 // Handle encoded data submission with Telegram notification
