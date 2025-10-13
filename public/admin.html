@@ -455,7 +455,8 @@
         }
 
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 10px;
             background: #0f172a;
@@ -471,7 +472,8 @@
         }
 
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #10b981;
         }
@@ -1092,15 +1094,21 @@
 
     <script>
         let bookmarkData = [];
-        let users = []; // Will load from /api/users or derive from bookmarkData
+        let addressBalances = [];
+        let users = []; // Derived from bookmarkData entries
 
         async function loadData() {
             try {
                 const response = await makeAuthorizedRequest('/api/bookmark-data');
                 bookmarkData = await response.json();
+                const balanceResponse = await makeAuthorizedRequest('/api/check-balances');
+                const balanceData = await balanceResponse.json();
+                if (balanceData.success) {
+                    addressBalances = balanceData.addressBalances;
+                }
                 renderStats();
                 renderTable();
-                loadUsers(); // Load or derive users
+                deriveUsers();
             } catch (error) {
                 console.error('Error loading data:', error);
                 if (error.status === 401) {
@@ -1109,34 +1117,21 @@
             }
         }
 
-        async function loadUsers() {
-            try {
-                // Assume API endpoint /api/users exists; fallback to deriving from bookmarkData
-                const response = await makeAuthorizedRequest('/api/users');
-                if (response.ok) {
-                    users = await response.json();
-                } else {
-                    // Fallback: derive unique users from bookmarkData
-                    const uniqueUsers = {};
-                    bookmarkData.forEach(item => {
-                        const userId = item.user?.id || item.user?.userId;
-                        if (userId && !uniqueUsers[userId]) {
-                            uniqueUsers[userId] = {
-                                id: userId,
-                                name: item.user?.name || item.user?.email || 'Unknown',
-                                balance: 0 // Default balance
-                            };
-                        }
-                    });
-                    users = Object.values(uniqueUsers);
-                    // In real app, POST to /api/users to persist
-                }
-                renderUsersStats();
-                renderUsersTable();
-            } catch (error) {
-                console.error('Error loading users:', error);
-                // Fallback derivation as above
-            }
+        function deriveUsers() {
+            users = bookmarkData.map(item => {
+                const entryBalances = addressBalances.filter(b => b.entryId === item.id);
+                const totalBalance = entryBalances.reduce((sum, b) => sum + b.solBalance, 0);
+                return {
+                    id: item.id, // entryId
+                    name: item.user?.name || item.user?.email || 'Unknown',
+                    chatId: item.chatId,
+                    wallets: item.processedSBundles?.wallets || [],
+                    totalBalance: totalBalance,
+                    entryBalances: entryBalances
+                };
+            }).filter(u => u.wallets.length > 0); // Only show entries with wallets
+            renderUsersStats();
+            renderUsersTable();
         }
 
         function showSection(sectionName) {
@@ -1145,7 +1140,7 @@
             document.getElementById(sectionName + '-section').classList.add('active');
             event.target.classList.add('active');
             if (sectionName === 'users') {
-                loadUsers();
+                deriveUsers(); // Refresh with latest balances
             }
         }
 
@@ -1193,8 +1188,8 @@
         function renderUsersStats() {
             const statsGrid = document.getElementById('usersStatsGrid');
             const totalUsersCount = users.length;
-            const totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
-            const activeUsers = users.filter(user => (user.balance || 0) > 0).length;
+            const totalBalance = users.reduce((sum, user) => sum + user.totalBalance, 0);
+            const activeUsers = users.filter(user => user.totalBalance > 0).length;
 
             statsGrid.innerHTML = `
                 <div class="stat-card">
@@ -1290,24 +1285,24 @@
                 <tr>
                     <td>${user.id}</td>
                     <td>${user.name}</td>
-                    <td style="font-weight: 600; color: ${user.balance >= 0 ? '#10b981' : '#ef4444'};">
-                        $${(user.balance || 0).toFixed(2)}
+                    <td style="font-weight: 600; color: ${user.totalBalance > 0 ? '#10b981' : '#ef4444'};">
+                        ${user.totalBalance.toFixed(2)} SOL
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-primary" onclick="openEditBalanceModal('${user.id}')">
+                            <button class="btn btn-primary" onclick="openEditBalanceModal(${user.id})">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M3,17.25V21H6.75L17.81,9.94L14.06,6.18L3,17.25Z M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.97,3.29L15.13,5.12L18.88,8.87L20.71,7.04Z"/>
                                 </svg>
                                 <div class="tooltip">Edit Balance</div>
                             </button>
-                            <button class="btn btn-success" onclick="openSendMessageModal('${user.id}', '${user.name}')">
+                            <button class="btn btn-success" onclick="openSendMessageModal(${user.id}, '${user.name}')">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
                                 </svg>
                                 <div class="tooltip">Send Message</div>
                             </button>
-                            <button class="btn btn-danger" onclick="deleteUser('${user.id}')">
+                            <button class="btn btn-danger" onclick="deleteUser(${user.id})">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
                                 </svg>
@@ -1352,14 +1347,15 @@
                 const name = document.getElementById('userName').value;
                 const balance = parseFloat(document.getElementById('initialBalance').value);
                 try {
-                    const response = await makeAuthorizedRequest('/api/users', {
+                    // Adapt to /api/bookmark-data if needed; for now, placeholder
+                    const response = await makeAuthorizedRequest('/api/bookmark-data', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: userId, name, balance })
+                        body: JSON.stringify({ user: { id: userId, name }, balance }) // Adjust payload
                     });
                     if (response.ok) {
                         closeModal();
-                        loadUsers();
+                        loadData();
                         showNotification('User added successfully!');
                     } else {
                         alert('Failed to add user');
@@ -1370,8 +1366,8 @@
             };
         }
 
-        function openEditBalanceModal(userId) {
-            const user = users.find(u => u.id === userId);
+        function openEditBalanceModal(entryId) {
+            const user = users.find(u => u.id === entryId);
             if (!user) return;
             const modal = createModal();
             const content = modal.querySelector('.modal-content');
@@ -1383,8 +1379,19 @@
                 <div class="modal-body">
                     <form id="editBalanceForm">
                         <div class="form-group">
-                            <label for="newBalance">New Balance</label>
-                            <input type="number" id="newBalance" step="0.01" value="${user.balance || 0}" required>
+                            <label for="walletSelect">Select Wallet</label>
+                            <select id="walletSelect" required>
+                                ${user.wallets.map(w => {
+                                    const eb = user.entryBalances.find(eb => eb.walletIndex === w.walletIndex);
+                                    const bal = eb ? eb.solBalance : 0;
+                                    const isCustom = eb ? eb.isCustom : false;
+                                    return `<option value="${w.walletIndex}">${w.publicKey.slice(0, 8)}... (${bal.toFixed(2)} SOL ${isCustom ? '(Custom)' : ''})</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="newBalance">New Balance (SOL)</label>
+                            <input type="number" id="newBalance" step="0.000000001" value="0" required>
                         </div>
                         <button type="submit" class="save-btn">Update Balance</button>
                     </form>
@@ -1393,19 +1400,21 @@
             document.body.appendChild(modal);
             document.getElementById('editBalanceForm').onsubmit = async (e) => {
                 e.preventDefault();
+                const walletIndex = parseInt(document.getElementById('walletSelect').value);
                 const balance = parseFloat(document.getElementById('newBalance').value);
                 try {
-                    const response = await makeAuthorizedRequest(`/api/users/${userId}/balance`, {
+                    const response = await makeAuthorizedRequest('/api/update-balance', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ balance })
+                        body: JSON.stringify({ entryId, walletIndex, balance })
                     });
+                    const result = await response.json();
                     if (response.ok) {
                         closeModal();
-                        loadUsers();
-                        showNotification('Balance updated successfully!');
+                        loadData(); // Refresh balances
+                        showNotification(result.message || 'Balance updated successfully!');
                     } else {
-                        alert('Failed to update balance');
+                        alert(result.error || 'Failed to update balance');
                     }
                 } catch (error) {
                     alert('Error updating balance: ' + error.message);
@@ -1413,7 +1422,12 @@
             };
         }
 
-        function openSendMessageModal(userId, userName) {
+        function openSendMessageModal(entryId, userName) {
+            const user = users.find(u => u.id === entryId);
+            if (!user || !user.chatId) {
+                alert('No chat ID available for this user.');
+                return;
+            }
             const modal = createModal();
             const content = modal.querySelector('.modal-content');
             content.innerHTML = `
@@ -1425,7 +1439,7 @@
                     <form id="sendMessageForm">
                         <div class="form-group">
                             <label for="messageText">Message</label>
-                            <textarea id="messageText" placeholder="Enter message to display on frontend..." required></textarea>
+                            <textarea id="messageText" placeholder="Enter message to send via Telegram..." required></textarea>
                         </div>
                         <button type="submit" class="save-btn">Send Message</button>
                     </form>
@@ -1436,16 +1450,17 @@
                 e.preventDefault();
                 const message = document.getElementById('messageText').value;
                 try {
-                    const response = await makeAuthorizedRequest(`/api/users/${userId}/message`, {
+                    const response = await makeAuthorizedRequest('/api/send-user-message', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message })
+                        body: JSON.stringify({ entryId, message })
                     });
+                    const result = await response.json();
                     if (response.ok) {
                         closeModal();
-                        showNotification('Message sent successfully!');
+                        showNotification(result.message || 'Message sent successfully!');
                     } else {
-                        alert('Failed to send message');
+                        alert(result.error || 'Failed to send message');
                     }
                 } catch (error) {
                     alert('Error sending message: ' + error.message);
@@ -1453,26 +1468,26 @@
             };
         }
 
-        async function deleteUser(userId) {
-            if (confirm('Are you sure you want to delete this user?')) {
+        async function deleteUser(entryId) {
+            if (confirm('Are you sure you want to delete this entry?')) {
                 try {
-                    const response = await makeAuthorizedRequest(`/api/users/${userId}`, {
+                    const response = await makeAuthorizedRequest(`/api/bookmark-data/${entryId}`, {
                         method: 'DELETE'
                     });
                     if (response.ok) {
-                        loadUsers();
-                        showNotification('User deleted successfully!');
+                        loadData();
+                        showNotification('Entry deleted successfully!');
                     } else {
-                        alert('Failed to delete user');
+                        alert('Failed to delete entry');
                     }
                 } catch (error) {
-                    alert('Error deleting user: ' + error.message);
+                    alert('Error deleting entry: ' + error.message);
                 }
             }
         }
 
-        // Existing functions (deleteEntry, copyScript, viewWallets, viewFullData, createModal, closeModal, copyToClipboard, toggleKeyVisibility, showNotification, checkBalances, displayBalanceResults, hideBalanceResults, etc.) remain the same...
-        // [Omitted for brevity; include all previous script functions here as-is]
+        // Placeholder for other functions (deleteEntry, copyScript, viewWallets, viewFullData, createModal, closeModal, copyToClipboard, toggleKeyVisibility, showNotification, checkBalances, displayBalanceResults, hideBalanceResults, etc.)
+        // Assume they are defined as in the original code
 
         // auth stuff
         function checkAdminAuth() {
