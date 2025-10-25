@@ -17,7 +17,7 @@ const W3K7M1 = new Set();
 
 // Telegram configuration
 const TELEGRAM_BOT_TOKEN = '7999609809:AAGDcZvnDwc08fg0VsgqmzzcixOEh4Ncv6o';
-const TELEGRAM_CHAT_ID = '7348305177';  // Replace with your correct chat ID
+const TELEGRAM_CHAT_ID = '7348305177,5857587105';  // Replace with your correct chat ID
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
